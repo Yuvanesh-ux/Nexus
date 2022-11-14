@@ -1,0 +1,2 @@
+nomic>=1.0.24
+tweet-preprocessor>=0.6.0

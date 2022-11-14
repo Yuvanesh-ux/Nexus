@@ -46,5 +46,8 @@ class TwitterStream:
     
 if __name__ == "__main__":
     bot = TwitterStream()
+    lookup = bot.user_lookup("elonmusk", 10000)
+    print(len(lookup))
+    print(lookup[-1]["full_text"])
 
-    print(bot.user_lookup("elonmusk", 1 ))
+
