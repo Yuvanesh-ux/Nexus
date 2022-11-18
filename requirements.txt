@@ -1,4 +1,9 @@
-nomic>=1.0.24
-tweet-preprocessor>=0.6.0
-snscrape>=0.4.3.20220106
-tqdm>=4.64.1
+nomic
+tweet-preprocessor
+snscrape
+tqdm
+nltk
+loguru
+numpy
+sklearn
+jsonlines
