@@ -9,9 +9,33 @@ from loguru import logger
 import numpy as np
 from sklearn.cluster import KMeans
 import os
+import re
+import posixpath  # For safe path manipulation
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+def sanitize_filename(filename):
+    """Sanitize a filename to prevent path traversal."""
+    # Remove any directory traversal components
+    safe_name = posixpath.basename(filename)
+    # Remove any other potentially dangerous characters
+    safe_name = re.sub(r'[^\w\.-]', '_', safe_name)
+    return safe_name
+
+
+def safe_path_join(base_dir, *paths):
+    """Safely join paths to prevent path traversal."""
+    # Make sure base_dir is absolute
+    base_dir = os.path.abspath(base_dir)
+    # Sanitize and join paths
+    safe_paths = [sanitize_filename(p) for p in paths]
+    path = os.path.join(base_dir, *safe_paths)
+    # Ensure result is still within base_dir
+    if not os.path.abspath(path).startswith(base_dir):
+        raise ValueError(f"Path traversal attempt detected: {path}")
+    return path
 
 
 class Profile:
@@ -31,7 +55,9 @@ class Profile:
         for user in users:
             tweets = [{"text": p.clean(tweet["full_text"]), "created_at": tweet["created_at"]} for tweet in
                       self.utils.user_lookup(user, lookup_amount)]
-            with jsonlines.open(f'{outdir}/{user}_tweets.jsonl', mode='a') as writer:
+            safe_filename = f"{sanitize_filename(user)}_tweets.jsonl"
+            safe_path = safe_path_join(outdir, safe_filename)
+            with jsonlines.open(safe_path, mode='a') as writer:
                 for idx, tweet in enumerate(tweets):
                     if len(tweet["text"]) < 10:
                         tweets.pop(idx)
@@ -70,14 +96,17 @@ class Profile:
         for user in tqdm(users):
             try:
                 logger.info(f"Loading {user}'s tweets from disk")
-                data_path = os.path.join(outdir, f"{user}_tweets.jsonl")
+                safe_filename = f"{sanitize_filename(user)}_tweets.jsonl"
+                data_path = safe_path_join(outdir, safe_filename)
                 with jsonlines.open(data_path, mode="r") as tweets:
                     for tweet in tweets:
                         all_tweets.append(tweet)
             except BaseException:
                 logger.info(f"Not on disk! scraping {users}'s tweets now")
                 tweets = self.utils.user_lookup_sns(user, 10000)
-                with jsonlines.open(f'{outdir}/{user}_tweets.jsonl', mode='a') as writer:
+                safe_filename = f"{sanitize_filename(user)}_tweets.jsonl"
+                safe_path = safe_path_join(outdir, safe_filename)
+                with jsonlines.open(safe_path, mode='a') as writer:
                     for idx, tweet in enumerate(tweets):
                         tweet["full_text"] = p.clean(tweet["full_text"])
                         if len(tweet["full_text"]) > 30:
@@ -94,7 +123,9 @@ class Profile:
             for n_clusters in n_cluster_docs:
                 logger.info(f"computing {n_clusters} cluster layer")
                 try:
-                    with open(f"data/cluster_labels/{users[0]}_id_to_cluster_label_{n_clusters}", "r") as f:
+                    safe_user = sanitize_filename(users[0])
+                    cluster_path = f"data/cluster_labels/{safe_user}_id_to_cluster_label_{n_clusters}"
+                    with open(cluster_path, "r") as f:
                         id_to_cluster_label = json.load(f)
                     logger.info("Loaded all resources from disk")
                     print(id_to_cluster_label[-1])
@@ -117,7 +148,9 @@ class Profile:
                     for datum, cluster_id in zip(all_tweets, [int(i) for i in list(kmeans.labels_)]):
                         id_to_cluster_label[datum['id']] = cluster_id
 
-                    with open(f'data/cluster_labels/{users[0]}_id_to_cluster_label_{n_clusters}', 'w') as f:
+                    safe_user = sanitize_filename(users[0])
+                    cluster_path = f"data/cluster_labels/{safe_user}_id_to_cluster_label_{n_clusters}"
+                    with open(cluster_path, 'w') as f:
                         json.dump(id_to_cluster_label, f)
                 print(len(all_tweets))
                 logger.info("Computing Topics")
