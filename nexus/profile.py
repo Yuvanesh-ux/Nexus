@@ -104,7 +104,7 @@ class Profile:
 
                     try:
                         logger.info("Loading embeddings from disk.")
-                        embeddings = np.load(embedding_path)
+                        embeddings = np.load(embedding_path, allow_pickle=False)
                     except BaseException:
                         logger.info("Embedding with Cohere")
                         cohere_api_key = os.getenv("COHERE_KEY")
