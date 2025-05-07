@@ -1,4 +1,7 @@
-#environment file
+# Ignore environment configuration files containing secrets
 .env
+.env.*
+!.env.example
 
+# Ignore IDE/editor files
 .idea
