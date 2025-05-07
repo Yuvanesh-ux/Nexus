@@ -14,6 +14,8 @@ stop_words = set(stopwords.words('english'))
 load_dotenv()
 
 class Utils:
+    MAX_TWEETS = 3200  # Maximum allowed tweets per Twitter API (user timeline)
+
     def __init__(self):
         api_key = os.getenv("API_KEY")
         api_secret = os.getenv("API_SECRET")
@@ -32,6 +34,13 @@ class Utils:
         :param quantity: amount of tweets you want to retrieve
 
         """
+        # Validate and cap quantity to prevent denial of service
+        if not isinstance(quantity, int) or quantity <= 0:
+            raise ValueError("Quantity must be a positive integer")
+        if quantity > self.MAX_TWEETS:
+            logger.info(f"Requested quantity {quantity} exceeds limit; capping to {self.MAX_TWEETS}.")
+            quantity = self.MAX_TWEETS
+
         query: List[Dict] = []
 
         tweets = tweepy.Cursor(
@@ -134,5 +143,3 @@ if __name__ == "__main__":
     lookup = bot.user_lookup_sns("JoeBiden", 5000)
     print(len(lookup))
     print(lookup[-1])
-
-
