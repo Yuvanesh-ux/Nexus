@@ -70,7 +70,8 @@ class Utils:
         ngram_cluster_frequency = defaultdict(lambda: defaultdict(lambda: 0))
         ngram_rarity_cluster_list = []
 
-        documents.pop(-1)
+        if documents:
+            documents.pop(-1)
 
         for datum in documents:
             cluster_id = id_to_cluster_label[datum[id_field]]
@@ -134,5 +135,3 @@ if __name__ == "__main__":
     lookup = bot.user_lookup_sns("JoeBiden", 5000)
     print(len(lookup))
     print(lookup[-1])
-
-
