@@ -14,6 +14,7 @@ stop_words = set(stopwords.words('english'))
 load_dotenv()
 
 class Utils:
+    TWEET_MAX_LIMIT = 3200  # Twitter's historical API limit, also reasonable for scrapers
     def __init__(self):
         api_key = os.getenv("API_KEY")
         api_secret = os.getenv("API_SECRET")
@@ -32,11 +33,12 @@ class Utils:
         :param quantity: amount of tweets you want to retrieve
 
         """
+        quantity_validated = self._validate_quantity(quantity)
         query: List[Dict] = []
 
         tweets = tweepy.Cursor(
             self.api.user_timeline, screen_name=user, count=200, tweet_mode="extended"
-        ).items(quantity)  # tweepy.Cursor allows for pagination due to the single request tweet limitations
+        ).items(quantity_validated)  # tweepy.Cursor allows for pagination due to the single request tweet limitations
 
         for tweet in tweets:
             query.append(tweet._json)
@@ -49,15 +51,27 @@ class Utils:
         :param quantity: last x tweets needed, chronologically
         :param user: twitter handle of user
         """
+        quantity_validated = self._validate_quantity(quantity)
         query: List[Dict] = []
 
-        logger.info(f"Pulling {user}'s tweets")
+        logger.info(f"Pulling {user}'s tweets (up to {quantity_validated})")
         for idx, tweet in tqdm(enumerate(sntwitter.TwitterSearchScraper(f'from:{user}').get_items())):
-            if idx > quantity:
+            if idx >= quantity_validated:
                 break
             query.append({"full_text": tweet.content, "tweet_link": f"https://twitter.com/{tweet.user.username}/status/{tweet.id}" , "created_at": tweet.date, "tweet_id": tweet.id, "user": tweet.user.username})
 
         return query
+
+    def _validate_quantity(self, quantity):
+        """Validate and sanitize the 'quantity' parameter."""
+        if not isinstance(quantity, int):
+            raise ValueError("quantity must be an integer.")
+        if quantity < 1:
+            raise ValueError("quantity must be at least 1.")
+        if quantity > self.TWEET_MAX_LIMIT:
+            logger.warning(f"Requested quantity {quantity} exceeds max limit ({self.TWEET_MAX_LIMIT}). Capping to {self.TWEET_MAX_LIMIT}.")
+            return self.TWEET_MAX_LIMIT
+        return quantity
 
     def create_topics(self, documents: List[Dict], id_to_cluster_label: Dict, id_field='id', text_field='full_text'):
         """
@@ -134,5 +148,3 @@ if __name__ == "__main__":
     lookup = bot.user_lookup_sns("JoeBiden", 5000)
     print(len(lookup))
     print(lookup[-1])
-
-
