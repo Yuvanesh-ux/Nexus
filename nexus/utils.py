@@ -14,6 +14,8 @@ stop_words = set(stopwords.words('english'))
 load_dotenv()
 
 class Utils:
+    MAX_TWEETS = 3200  # Twitter API's maximum limit for user_timeline
+
     def __init__(self):
         api_key = os.getenv("API_KEY")
         api_secret = os.getenv("API_SECRET")
@@ -32,6 +34,17 @@ class Utils:
         :param quantity: amount of tweets you want to retrieve
 
         """
+        # Cap quantity to the allowed bounds
+        if not isinstance(quantity, int):
+            try:
+                quantity = int(quantity)
+            except Exception:
+                quantity = 0
+        if quantity < 1:
+            quantity = 0
+        elif quantity > self.MAX_TWEETS:
+            quantity = self.MAX_TWEETS
+
         query: List[Dict] = []
 
         tweets = tweepy.Cursor(
@@ -134,5 +147,3 @@ if __name__ == "__main__":
     lookup = bot.user_lookup_sns("JoeBiden", 5000)
     print(len(lookup))
     print(lookup[-1])
-
-
