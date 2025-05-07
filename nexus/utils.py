@@ -25,6 +25,20 @@ class Utils:
 
         self.api = tweepy.API(auth)
     
+    @staticmethod
+    def _sanitize_for_log(text: str) -> str:
+        # Remove newlines, carriage returns, and control characters
+        # Remove ANSI escape sequences as well
+        if not isinstance(text, str):
+            return ""
+        # Remove ANSI escape sequences
+        text = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', text)
+        # Remove non-printable/control characters (ASCII < 32 except TAB)
+        text = ''.join(ch for ch in text if 32 <= ord(ch) <= 126 or ch == '\t')
+        # Remove newlines and carriage returns explicitly (in case they're still present)
+        text = text.replace('\n', '').replace('\r', '')
+        return text
+    
     def user_lookup_tweepy(self, user: str, quantity: int):
         """Obtain Tweets from a specific user.(only up to 3200 tweets)
 
@@ -51,7 +65,8 @@ class Utils:
         """
         query: List[Dict] = []
 
-        logger.info(f"Pulling {user}'s tweets")
+        sanitized_user = self._sanitize_for_log(user)
+        logger.info(f"Pulling {sanitized_user}'s tweets")
         for idx, tweet in tqdm(enumerate(sntwitter.TwitterSearchScraper(f'from:{user}').get_items())):
             if idx > quantity:
                 break
@@ -134,5 +149,3 @@ if __name__ == "__main__":
     lookup = bot.user_lookup_sns("JoeBiden", 5000)
     print(len(lookup))
     print(lookup[-1])
-
-
