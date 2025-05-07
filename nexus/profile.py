@@ -19,6 +19,21 @@ class Profile:
         self.utils = Utils()
         self.atlas = AtlasClient()
 
+    @staticmethod
+    def _safe_log_str(s, max_len=128):
+        """Sanitize strings for safe logging: escape newlines, limit length, remove dangerous chars."""
+        if not isinstance(s, str):
+            s = str(s)
+
+        # Escape common log-breaking characters
+        s = s.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+        # Truncate to maximum length
+        if len(s) > max_len:
+            s = s[:max_len] + '...'
+        # Remove other potentially problematic control characters
+        s = ''.join(ch if 32 <= ord(ch) < 127 else '\\x{:02x}'.format(ord(ch)) for ch in s)
+        return s
+
     def create_social_profile_tweepy(self, map_name: str, map_description: str, users: List[str], outdir: str):
         """Create social profile with tweepy as tweet source
 
@@ -69,13 +84,14 @@ class Profile:
 
         for user in tqdm(users):
             try:
-                logger.info(f"Loading {user}'s tweets from disk")
+                logger.info(f"Loading {self._safe_log_str(user)}'s tweets from disk")
                 data_path = os.path.join(outdir, f"{user}_tweets.jsonl")
                 with jsonlines.open(data_path, mode="r") as tweets:
                     for tweet in tweets:
                         all_tweets.append(tweet)
             except BaseException:
-                logger.info(f"Not on disk! scraping {users}'s tweets now")
+                users_str = ','.join(self._safe_log_str(u) for u in users)
+                logger.info(f"Not on disk! scraping {self._safe_log_str(user)}'s tweets now (users list: [{users_str}])")
                 tweets = self.utils.user_lookup_sns(user, 10000)
                 with jsonlines.open(f'{outdir}/{user}_tweets.jsonl', mode='a') as writer:
                     for idx, tweet in enumerate(tweets):
