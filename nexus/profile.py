@@ -10,6 +10,7 @@ import numpy as np
 from sklearn.cluster import KMeans
 import os
 from dotenv import load_dotenv
+import re
 
 load_dotenv()
 
@@ -18,6 +19,34 @@ class Profile:
     def __init__(self):
         self.utils = Utils()
         self.atlas = AtlasClient()
+
+    def _neutralize_for_log(self, value):
+        """
+        Neutralize string for safe log output by escaping special characters
+        that could be used for log injection (CWE-117).
+        - Replace newlines, carriage returns, tabs with escape sequences
+        - Remove ANSI escape sequences
+        - If input is a list, sanitize each element
+        """
+        ansi_escape = re.compile(r'''
+            \x1B  # ESC
+            (?:   # 7-bit C1 Fe (except CSI)
+                [@-Z\\-_]
+            |     # or [ for CSI, followed by any chars up to 'm'
+                \[ [0-?]* [ -/]* [@-~]
+            )
+        ''', re.VERBOSE)
+        def neutralize_str(s):
+            if not isinstance(s, str):
+                s = str(s)
+            s = ansi_escape.sub('', s)
+            s = s.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+            return s
+        # Handle lists (like 'users' variable)
+        if isinstance(value, list):
+            return [neutralize_str(v) for v in value]
+        else:
+            return neutralize_str(value)
 
     def create_social_profile_tweepy(self, map_name: str, map_description: str, users: List[str], outdir: str):
         """Create social profile with tweepy as tweet source
@@ -68,14 +97,16 @@ class Profile:
 
 
         for user in tqdm(users):
+            user_safe = self._neutralize_for_log(user)
+            users_safe = self._neutralize_for_log(users)
             try:
-                logger.info(f"Loading {user}'s tweets from disk")
+                logger.info(f"Loading {user_safe}'s tweets from disk")
                 data_path = os.path.join(outdir, f"{user}_tweets.jsonl")
                 with jsonlines.open(data_path, mode="r") as tweets:
                     for tweet in tweets:
                         all_tweets.append(tweet)
             except BaseException:
-                logger.info(f"Not on disk! scraping {users}'s tweets now")
+                logger.info(f"Not on disk! scraping {users_safe}'s tweets now")
                 tweets = self.utils.user_lookup_sns(user, 10000)
                 with jsonlines.open(f'{outdir}/{user}_tweets.jsonl', mode='a') as writer:
                     for idx, tweet in enumerate(tweets):
