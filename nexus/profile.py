@@ -19,6 +19,12 @@ class Profile:
         self.utils = Utils()
         self.atlas = AtlasClient()
 
+    @staticmethod
+    def _sanitize_filename_component(name: str) -> str:
+        # Only allow safe chars: alphanum, underscore, dash, period
+        # Replace others with '_'
+        return ''.join(c if c.isalnum() or c in ('_', '-', '.') else '_' for c in name)
+
     def create_social_profile_tweepy(self, map_name: str, map_description: str, users: List[str], outdir: str):
         """Create social profile with tweepy as tweet source
 
@@ -93,8 +99,11 @@ class Profile:
             n_cluster_docs = [40]
             for n_clusters in n_cluster_docs:
                 logger.info(f"computing {n_clusters} cluster layer")
+                # Sanitize the username before using it for the filename
+                sanitized_user = self._sanitize_filename_component(users[0])
+                cluster_label_path = f"data/cluster_labels/{sanitized_user}_id_to_cluster_label_{n_clusters}"
                 try:
-                    with open(f"data/cluster_labels/{users[0]}_id_to_cluster_label_{n_clusters}", "r") as f:
+                    with open(cluster_label_path, "r") as f:
                         id_to_cluster_label = json.load(f)
                     logger.info("Loaded all resources from disk")
                     print(id_to_cluster_label[-1])
@@ -117,7 +126,7 @@ class Profile:
                     for datum, cluster_id in zip(all_tweets, [int(i) for i in list(kmeans.labels_)]):
                         id_to_cluster_label[datum['id']] = cluster_id
 
-                    with open(f'data/cluster_labels/{users[0]}_id_to_cluster_label_{n_clusters}', 'w') as f:
+                    with open(cluster_label_path, 'w') as f:
                         json.dump(id_to_cluster_label, f)
                 print(len(all_tweets))
                 logger.info("Computing Topics")
