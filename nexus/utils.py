@@ -14,6 +14,8 @@ stop_words = set(stopwords.words('english'))
 load_dotenv()
 
 class Utils:
+    MAX_TWEETS = 3200  # Twitter API 'user_timeline' max
+
     def __init__(self):
         api_key = os.getenv("API_KEY")
         api_secret = os.getenv("API_SECRET")
@@ -29,14 +31,18 @@ class Utils:
         """Obtain Tweets from a specific user.(only up to 3200 tweets)
 
         :param user: specified user you want to retrieve tweets from
-        :param quantity: amount of tweets you want to retrieve
+        :param quantity: amount of tweets you want to retrieve (1-3200 inclusive)
 
         """
+        if not isinstance(quantity, int):
+            raise ValueError("quantity must be an integer")
+        if quantity < 1 or quantity > self.MAX_TWEETS:
+            raise ValueError(f"quantity must be between 1 and {self.MAX_TWEETS} (inclusive)")
         query: List[Dict] = []
 
         tweets = tweepy.Cursor(
             self.api.user_timeline, screen_name=user, count=200, tweet_mode="extended"
-        ).items(quantity)  # tweepy.Cursor allows for pagination due to the single request tweet limitations
+        ).items(quantity)
 
         for tweet in tweets:
             query.append(tweet._json)
@@ -49,11 +55,15 @@ class Utils:
         :param quantity: last x tweets needed, chronologically
         :param user: twitter handle of user
         """
+        if not isinstance(quantity, int):
+            raise ValueError("quantity must be an integer")
+        if quantity < 1 or quantity > self.MAX_TWEETS:
+            raise ValueError(f"quantity must be between 1 and {self.MAX_TWEETS} (inclusive)")
         query: List[Dict] = []
 
         logger.info(f"Pulling {user}'s tweets")
         for idx, tweet in tqdm(enumerate(sntwitter.TwitterSearchScraper(f'from:{user}').get_items())):
-            if idx > quantity:
+            if idx >= quantity:
                 break
             query.append({"full_text": tweet.content, "tweet_link": f"https://twitter.com/{tweet.user.username}/status/{tweet.id}" , "created_at": tweet.date, "tweet_id": tweet.id, "user": tweet.user.username})
 
@@ -134,5 +144,3 @@ if __name__ == "__main__":
     lookup = bot.user_lookup_sns("JoeBiden", 5000)
     print(len(lookup))
     print(lookup[-1])
-
-
