@@ -1,4 +1,13 @@
-#environment file
+# environment files -- exclude all env and secret files
 .env
+.env.*
+!.env.example
+
+# WARNING: If .env or other sensitive files were committed in the past,
+# you must:
+#  1. Rotate credentials (invalidate and reissue them).
+#  2. Remove the file from git history 
+#     (see: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository)
+# This .gitignore only prevents future commits.
 
 .idea
