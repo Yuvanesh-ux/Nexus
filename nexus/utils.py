@@ -14,6 +14,8 @@ stop_words = set(stopwords.words('english'))
 load_dotenv()
 
 class Utils:
+    MAX_TWEET_LIMIT = 3200
+
     def __init__(self):
         api_key = os.getenv("API_KEY")
         api_secret = os.getenv("API_SECRET")
@@ -32,6 +34,13 @@ class Utils:
         :param quantity: amount of tweets you want to retrieve
 
         """
+        # Sanitize and clamp quantity
+        if not isinstance(quantity, int) or quantity <= 0:
+            raise ValueError(f"quantity must be a positive integer, got {quantity}")
+        if quantity > self.MAX_TWEET_LIMIT:
+            logger.warning(f"Requested quantity {quantity} exceeds maximum ({self.MAX_TWEET_LIMIT}); capping at {self.MAX_TWEET_LIMIT}.")
+            quantity = self.MAX_TWEET_LIMIT
+
         query: List[Dict] = []
 
         tweets = tweepy.Cursor(
@@ -49,11 +58,18 @@ class Utils:
         :param quantity: last x tweets needed, chronologically
         :param user: twitter handle of user
         """
+        # Sanitize and clamp quantity for consistency
+        if not isinstance(quantity, int) or quantity <= 0:
+            raise ValueError(f"quantity must be a positive integer, got {quantity}")
+        if quantity > self.MAX_TWEET_LIMIT:
+            logger.warning(f"Requested quantity {quantity} exceeds maximum ({self.MAX_TWEET_LIMIT}); capping at {self.MAX_TWEET_LIMIT}.")
+            quantity = self.MAX_TWEET_LIMIT
+
         query: List[Dict] = []
 
         logger.info(f"Pulling {user}'s tweets")
         for idx, tweet in tqdm(enumerate(sntwitter.TwitterSearchScraper(f'from:{user}').get_items())):
-            if idx > quantity:
+            if idx >= quantity:
                 break
             query.append({"full_text": tweet.content, "tweet_link": f"https://twitter.com/{tweet.user.username}/status/{tweet.id}" , "created_at": tweet.date, "tweet_id": tweet.id, "user": tweet.user.username})
 
@@ -134,5 +150,3 @@ if __name__ == "__main__":
     lookup = bot.user_lookup_sns("JoeBiden", 5000)
     print(len(lookup))
     print(lookup[-1])
-
-
