@@ -10,6 +10,7 @@ import numpy as np
 from sklearn.cluster import KMeans
 import os
 from dotenv import load_dotenv
+import re
 
 load_dotenv()
 
@@ -28,10 +29,22 @@ class Profile:
         :param outdir: specified directory of where the tweets(in JSON format) shoudl go
         """
         lookup_amount = 10000
+        # Normalize and validate output directory
+        outdir_abs = os.path.abspath(outdir)
+        os.makedirs(outdir_abs, exist_ok=True)
+
         for user in users:
+            # Sanitize user to avoid path traversal and invalid characters
+            safe_user = re.sub(r'[^a-zA-Z0-9_-]', '_', user)
+            filename = f"{safe_user}_tweets.jsonl"
+            file_path = os.path.normpath(os.path.join(outdir_abs, filename))
+            # Ensure that the resolved path is within the intended outdir
+            if not os.path.commonpath([file_path, outdir_abs]) == outdir_abs:
+                raise ValueError("Invalid user or outdir: Path traversal detected.")
+
             tweets = [{"text": p.clean(tweet["full_text"]), "created_at": tweet["created_at"]} for tweet in
                       self.utils.user_lookup(user, lookup_amount)]
-            with jsonlines.open(f'{outdir}/{user}_tweets.jsonl', mode='a') as writer:
+            with jsonlines.open(file_path, mode='a') as writer:
                 for idx, tweet in enumerate(tweets):
                     if len(tweet["text"]) < 10:
                         tweets.pop(idx)
@@ -66,25 +79,34 @@ class Profile:
         """
         all_tweets = []
 
+        # Normalize and validate output directory
+        outdir_abs = os.path.abspath(outdir)
+        os.makedirs(outdir_abs, exist_ok=True)
 
         for user in tqdm(users):
+            # Sanitize user to avoid path traversal and invalid characters
+            safe_user = re.sub(r'[^a-zA-Z0-9_-]', '_', user)
+            filename = f"{safe_user}_tweets.jsonl"
+            data_path = os.path.normpath(os.path.join(outdir_abs, filename))
+            # Ensure that the resolved path is within the intended outdir
+            if not os.path.commonpath([data_path, outdir_abs]) == outdir_abs:
+                raise ValueError("Invalid user or outdir: Path traversal detected.")
+
             try:
                 logger.info(f"Loading {user}'s tweets from disk")
-                data_path = os.path.join(outdir, f"{user}_tweets.jsonl")
                 with jsonlines.open(data_path, mode="r") as tweets:
                     for tweet in tweets:
                         all_tweets.append(tweet)
             except BaseException:
-                logger.info(f"Not on disk! scraping {users}'s tweets now")
+                logger.info(f"Not on disk! scraping {user}'s tweets now")
                 tweets = self.utils.user_lookup_sns(user, 10000)
-                with jsonlines.open(f'{outdir}/{user}_tweets.jsonl', mode='a') as writer:
+                with jsonlines.open(data_path, mode='a') as writer:
                     for idx, tweet in enumerate(tweets):
                         tweet["full_text"] = p.clean(tweet["full_text"])
                         if len(tweet["full_text"]) > 30:
                             tweet["created_at"] = str(tweet["created_at"])
                             all_tweets.append(tweet)
                             writer.write(tweet)
-
 
             for idx, tweet in enumerate(all_tweets):
                 tweet["id"] = str(idx)
