@@ -49,11 +49,21 @@ class Utils:
         :param quantity: last x tweets needed, chronologically
         :param user: twitter handle of user
         """
+        MAX_TWEETS = 5000  # hard limit to prevent resource abuse
+        if not isinstance(quantity, int):
+            raise ValueError("quantity must be an integer")
+        if quantity <= 0:
+            raise ValueError("quantity must be > 0")
+        if quantity > MAX_TWEETS:
+            raise ValueError(f"Requested quantity {quantity} exceeds allowed maximum ({MAX_TWEETS})")
+
         query: List[Dict] = []
 
-        logger.info(f"Pulling {user}'s tweets")
+        # Sanitize user input before logging to prevent log injection
+        sanitized_user = user.replace('\n', ' ').replace('\r', ' ')
+        logger.info(f"Pulling {sanitized_user}'s tweets (max {quantity})")
         for idx, tweet in tqdm(enumerate(sntwitter.TwitterSearchScraper(f'from:{user}').get_items())):
-            if idx > quantity:
+            if idx >= quantity:
                 break
             query.append({"full_text": tweet.content, "tweet_link": f"https://twitter.com/{tweet.user.username}/status/{tweet.id}" , "created_at": tweet.date, "tweet_id": tweet.id, "user": tweet.user.username})
 
@@ -134,5 +144,3 @@ if __name__ == "__main__":
     lookup = bot.user_lookup_sns("JoeBiden", 5000)
     print(len(lookup))
     print(lookup[-1])
-
-
