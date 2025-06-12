@@ -13,6 +13,42 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+EMBEDDINGS_DIR = "embeddings"
+
+
+def is_safe_embedding_path(path: str) -> str:
+    """
+    Validates and constructs an absolute, safe path for embedding files.
+    Ensures the path is within the EMBEDDINGS_DIR directory, prevents path
+    traversal and absolute path usage.
+
+    :param path: User-supplied relative embedding file path.
+    :return: The safe, absolute path to use.
+    :raises ValueError: If the path is unsafe or not inside EMBEDDINGS_DIR.
+    """
+    if not path:
+        raise ValueError("Empty embedding path provided.")
+    if os.path.isabs(path):
+        raise ValueError("Absolute paths are not allowed for embedding_path.")
+
+    # Ensure embedding_path is relative to EMBEDDINGS_DIR
+    abs_embeddings_dir = os.path.abspath(EMBEDDINGS_DIR)
+    joined_path = os.path.join(EMBEDDINGS_DIR, path)
+    abs_target_path = os.path.abspath(joined_path)
+
+    if not abs_target_path.startswith(abs_embeddings_dir + os.sep):
+        raise ValueError(
+            f"Insecure embedding_path '{path}' detected. "
+            f"Path must be within '{EMBEDDINGS_DIR}/' directory."
+        )
+
+    # Ensure the target directory exists
+    target_dir = os.path.dirname(abs_target_path)
+    if not os.path.exists(target_dir):
+        os.makedirs(target_dir, exist_ok=True)
+
+    return abs_target_path
+
 
 class Profile:
     def __init__(self):
@@ -104,13 +140,15 @@ class Profile:
 
                     try:
                         logger.info("Loading embeddings from disk.")
-                        embeddings = np.load(embedding_path)
+                        safe_embedding_path = is_safe_embedding_path(embedding_path)
+                        embeddings = np.load(safe_embedding_path)
                     except BaseException:
                         logger.info("Embedding with Cohere")
                         cohere_api_key = os.getenv("COHERE_KEY")
                         embedder = CohereEmbedder(cohere_api_key=cohere_api_key)
                         embeddings = np.array(embedder.embed(texts=[datum['full_text'] for datum in all_tweets])).squeeze()
-                        with open(embedding_path, 'wb') as f:
+                        safe_embedding_path = is_safe_embedding_path(embedding_path)
+                        with open(safe_embedding_path, 'wb') as f:
                             np.save(f, embeddings)
                     logger.info("Running Kmeans to generate clusters")
                     kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(embeddings)
@@ -144,4 +182,4 @@ if __name__ == "__main__":
                                        map_description="A social profile of the latest POTUS Joe Biden, with Nomic's text embedder created by Yuvanesh Anand",
                                        users=["JoeBiden", "POTUS"],
                                        topics=True,
-                                       embedding_path="embeddings/JoeBiden.npy")
+                                       embedding_path="JoeBiden.npy")
